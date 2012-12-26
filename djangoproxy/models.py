@@ -47,6 +47,7 @@ class ProxyChecker(models.Model):
 
     def _raw_check(self, proxy):
         """Actually execute the check"""
+
         import pycurl
         import cStringIO
          
@@ -155,10 +156,13 @@ class Proxy(models.Model):
 
     connection_time = models.PositiveIntegerField(null=True, blank=True)
 
-    proxy_type = models.CharField(max_length=10, 
+    proxy_type = models.CharField(default='http',
+                                  max_length=10, 
                                   choices=proxy_type_choices)
 
     anonymity_level = models.PositiveIntegerField(
+                         null=True,
+                         default=None,
                          choices = anonymity_level_choices)
 
 
