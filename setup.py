@@ -20,6 +20,8 @@ setup(name='django-proxy',
       install_requires=[
           'django-countries',
           'pycurl',
+          'pygeoip',
+          'django-celery',
           # -*- Extra requirements: -*-
       ],
       entry_points="""
