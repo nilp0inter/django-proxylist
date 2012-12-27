@@ -23,7 +23,7 @@ DJANGOPROXY_USER_AGENT = getsettings("DJANGOPROXY_USER_AGENT",
                                      "Django-Proxy 1.0.0")
 DJANGOPROXY_GEOIP_PATH = getsettings("DJANGOPROXY_GEOIP_PATH",
                                      "/usr/share/GeoIP/GeoIP.dat")
-DJANGOPROXY_CACHE_TIMEOUT = getsettings("DJANGOPROXY_CACHE_TIMEOUT", 300)
+DJANGOPROXY_CACHE_TIMEOUT = getsettings("DJANGOPROXY_CACHE_TIMEOUT", 0) # Forever!
 DJANGOPROXY_CONNECTION_TIMEOUT = getsettings("DJANGOPROXY_CONNECTION_TIMEOUT", 
                                              30)
 DJANGOPROXY_OUTBOUND_IP_CHECK_INTERVAL = getsettings("DJANGOPROXY_OUTBOUND_IP_CHECK_INTERVAL", 
