@@ -6,11 +6,19 @@
 Welcome to Django-ProxyList's documentation!
 ============================================
 
+`django-proxylist` is a reusable app for maintain an up-to-date 
+(through checking) list of proxy servers.
+
 Contents:
 
 .. toctree::
    :maxdepth: 2
 
+   introduction
+   dependencies
+   install
+   usecase
+   commands
 
 
 Indices and tables
