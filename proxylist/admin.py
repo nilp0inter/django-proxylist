@@ -1,4 +1,4 @@
-from djangoproxy.models import Proxy, ProxyChecker, ProxyCheckResult 
+from proxylist.models import Proxy, Mirror, ProxyCheckResult 
 from django.contrib import admin
 
 class ProxyAdmin(admin.ModelAdmin):
@@ -8,7 +8,7 @@ class ProxyAdmin(admin.ModelAdmin):
     search_fields = ('=ip_address', '=port', 'country', )
 
 admin.site.register(Proxy, ProxyAdmin)
-admin.site.register(ProxyChecker)
+admin.site.register(Mirror)
 
 # Debug
 #admin.site.register(ProxyCheckResult)

@@ -1,8 +1,9 @@
+# -*- coding: utf-8 -*-
+
 import os
 
 from django.core.management.base import BaseCommand, CommandError
-
-from djangoproxy.models import Proxy
+from proxylist.models import Proxy
 
 class Command(BaseCommand):
     args = '<hidemyass proxy list files>'
@@ -33,6 +34,5 @@ class Command(BaseCommand):
                         self.stderr.write("Invalid port %s value" % port)
                         continue
 
-                    p, created = Proxy.objects.get_or_create(
-                                    ip_address=ip_address, 
-                                    port=port)
+                    p, created = Proxy.objects.get_or_create(ip_address=ip_address, 
+                                                             port=port)

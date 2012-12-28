@@ -19,25 +19,25 @@ ANONYMITY_HIGH   = 16
 def getsettings(key, default):
     return getattr(settings, key, default)
       
-DJANGOPROXY_USER_AGENT = getsettings("DJANGOPROXY_USER_AGENT", 
+PROXYLIST_USER_AGENT = getsettings("PROXYLIST_USER_AGENT", 
                                      "Django-Proxy 1.0.0")
-DJANGOPROXY_GEOIP_PATH = getsettings("DJANGOPROXY_GEOIP_PATH",
+PROXYLIST_GEOIP_PATH = getsettings("PROXYLIST_GEOIP_PATH",
                                      "/usr/share/GeoIP/GeoIP.dat")
-DJANGOPROXY_CACHE_TIMEOUT = getsettings("DJANGOPROXY_CACHE_TIMEOUT", 0) # Forever!
-DJANGOPROXY_CONNECTION_TIMEOUT = getsettings("DJANGOPROXY_CONNECTION_TIMEOUT", 
+PROXYLIST_CACHE_TIMEOUT = getsettings("PROXYLIST_CACHE_TIMEOUT", 0) # Forever!
+PROXYLIST_CONNECTION_TIMEOUT = getsettings("PROXYLIST_CONNECTION_TIMEOUT", 
                                              30)
-DJANGOPROXY_OUTBOUND_IP_CHECK_INTERVAL = getsettings("DJANGOPROXY_OUTBOUND_IP_CHECK_INTERVAL", 
+PROXYLIST_OUTBOUND_IP_CHECK_INTERVAL = getsettings("PROXYLIST_OUTBOUND_IP_CHECK_INTERVAL", 
                                                      300)
-DJANGOPROXY_MIN_CHECK_INTERVAL = getsettings("DJANGOPROXY_MIN_CHECK_INTERVAL",
+PROXYLIST_MIN_CHECK_INTERVAL = getsettings("PROXYLIST_MIN_CHECK_INTERVAL",
                                              300)
-DJANGOPROXY_MAX_CHECK_INTERVAL = getsettings("DJANGOPROXY_MAX_CHECK_INTERVAL",
+PROXYLIST_MAX_CHECK_INTERVAL = getsettings("PROXYLIST_MAX_CHECK_INTERVAL",
                                              900)
-DJANGOPROXY_ERROR_DELAY = getsettings("DJANGOPROXY_ERRORDELAY", 300)
+PROXYLIST_ERROR_DELAY = getsettings("PROXYLIST_ERRORDELAY", 300)
 
 class ProxyCheckResult(models.Model):
     """The result of a proxy check"""
 
-    proxy_checker = models.ForeignKey('ProxyChecker')
+    proxy_checker = models.ForeignKey('Mirror')
     proxy = models.ForeignKey('Proxy')
 
     real_ip_address = models.IPAddressField(blank=True, null=True)
@@ -73,15 +73,15 @@ class ProxyCheckResult(models.Model):
             c = pycurl.Curl()
             c.setopt(pycurl.URL, "http://ifconfig.me/ip")
             c.setopt(pycurl.WRITEFUNCTION, buf.write)
-            c.setopt(pycurl.CONNECTTIMEOUT, DJANGOPROXY_CONNECTION_TIMEOUT)
-            c.setopt(pycurl.TIMEOUT, DJANGOPROXY_CONNECTION_TIMEOUT)
-            c.setopt(pycurl.USERAGENT, DJANGOPROXY_USER_AGENT)
+            c.setopt(pycurl.CONNECTTIMEOUT, PROXYLIST_CONNECTION_TIMEOUT)
+            c.setopt(pycurl.TIMEOUT, PROXYLIST_CONNECTION_TIMEOUT)
+            c.setopt(pycurl.USERAGENT, PROXYLIST_USER_AGENT)
 
             c.perform()
 
             ip = buf.getvalue().replace('\n', '').replace('\r', '')
 
-            cache.set(ip_key, ip, DJANGOPROXY_OUTBOUND_IP_CHECK_INTERVAL) 
+            cache.set(ip_key, ip, PROXYLIST_OUTBOUND_IP_CHECK_INTERVAL) 
             return ip
 
         except:
@@ -107,7 +107,7 @@ class ProxyCheckResult(models.Model):
             raise ValueError('Anonymity type not defined')
 
 
-class ProxyChecker(models.Model):
+class Mirror(models.Model):
     """A proxy checker site like. 
     Ex: http://ifconfig.me/all.json
     """
@@ -142,12 +142,12 @@ class ProxyChecker(models.Model):
             c = pycurl.Curl()
             c.setopt(pycurl.URL, str(self.url))
             c.setopt(pycurl.WRITEFUNCTION, buf.write)
-            c.setopt(pycurl.CONNECTTIMEOUT, DJANGOPROXY_CONNECTION_TIMEOUT)
-            c.setopt(pycurl.TIMEOUT, DJANGOPROXY_CONNECTION_TIMEOUT)
+            c.setopt(pycurl.CONNECTTIMEOUT, PROXYLIST_CONNECTION_TIMEOUT)
+            c.setopt(pycurl.TIMEOUT, PROXYLIST_CONNECTION_TIMEOUT)
             c.setopt(pycurl.PROXY, str(proxy.ip_address))
             c.setopt(pycurl.PROXYPORT, proxy.port)
             c.setopt(pycurl.PROXYTYPE, proxy.curl_type())
-            c.setopt(pycurl.USERAGENT, DJANGOPROXY_USER_AGENT)
+            c.setopt(pycurl.USERAGENT, PROXYLIST_USER_AGENT)
 
             c.perform()
 
@@ -213,7 +213,7 @@ class ProxyChecker(models.Model):
             cache.delete(check_key)
 
     def check(self, proxy):
-        from djangoproxy.tasks import async_check
+        from proxylist.tasks import async_check
 
         check_key = "proxy.%s.check" % proxy.pk
 
@@ -221,7 +221,7 @@ class ProxyChecker(models.Model):
             return None
         else:
             # Task lock
-            cache.add(check_key, "true", DJANGOPROXY_CACHE_TIMEOUT)
+            cache.add(check_key, "true", PROXYLIST_CACHE_TIMEOUT)
 
         return async_check.apply_async((proxy, self))
 
@@ -229,7 +229,7 @@ class ProxyChecker(models.Model):
 class Proxy(models.Model):
     """A proxy server"""
 
-    _geoip = GeoIP(DJANGOPROXY_GEOIP_PATH)
+    _geoip = GeoIP(PROXYLIST_GEOIP_PATH)
 
     proxy_type_choices = (
         ('http', 'HTTP'), 
@@ -296,10 +296,10 @@ class Proxy(models.Model):
 
         from random import randint
 
-        delay = randint(DJANGOPROXY_MIN_CHECK_INTERVAL, 
-                        DJANGOPROXY_MAX_CHECK_INTERVAL)
+        delay = randint(PROXYLIST_MIN_CHECK_INTERVAL, 
+                        PROXYLIST_MAX_CHECK_INTERVAL)
 
-        delay += DJANGOPROXY_ERROR_DELAY * self.errors
+        delay += PROXYLIST_ERROR_DELAY * self.errors
 
         if self.last_check:
             self.next_check = self.last_check + timedelta(seconds=delay)
