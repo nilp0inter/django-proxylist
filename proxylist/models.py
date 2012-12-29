@@ -19,20 +19,14 @@ ANONYMITY_HIGH   = 16
 def getsettings(key, default):
     return getattr(settings, key, default)
       
-PROXYLIST_USER_AGENT = getsettings("PROXYLIST_USER_AGENT", 
-                                     "Django-Proxy 1.0.0")
-PROXYLIST_GEOIP_PATH = getsettings("PROXYLIST_GEOIP_PATH",
-                                     "/usr/share/GeoIP/GeoIP.dat")
 PROXYLIST_CACHE_TIMEOUT = getsettings("PROXYLIST_CACHE_TIMEOUT", 0) # Forever!
-PROXYLIST_CONNECTION_TIMEOUT = getsettings("PROXYLIST_CONNECTION_TIMEOUT", 
-                                             30)
-PROXYLIST_OUTBOUND_IP_CHECK_INTERVAL = getsettings("PROXYLIST_OUTBOUND_IP_CHECK_INTERVAL", 
-                                                     300)
-PROXYLIST_MIN_CHECK_INTERVAL = getsettings("PROXYLIST_MIN_CHECK_INTERVAL",
-                                             300)
-PROXYLIST_MAX_CHECK_INTERVAL = getsettings("PROXYLIST_MAX_CHECK_INTERVAL",
-                                             900)
+PROXYLIST_CONNECTION_TIMEOUT = getsettings("PROXYLIST_CONNECTION_TIMEOUT", 30)
 PROXYLIST_ERROR_DELAY = getsettings("PROXYLIST_ERRORDELAY", 300)
+PROXYLIST_GEOIP_PATH = getsettings("PROXYLIST_GEOIP_PATH", "/usr/share/GeoIP/GeoIP.dat")
+PROXYLIST_MAX_CHECK_INTERVAL = getsettings("PROXYLIST_MAX_CHECK_INTERVAL", 900)
+PROXYLIST_MIN_CHECK_INTERVAL = getsettings("PROXYLIST_MIN_CHECK_INTERVAL", 300)
+PROXYLIST_OUTIP_INTERVAL = getsettings("PROXYLIST_OUTIP_INTERVAL", 300)
+PROXYLIST_USER_AGENT = getsettings("PROXYLIST_USER_AGENT", "Django-Proxy 1.0.0")
 
 class ProxyCheckResult(models.Model):
     """The result of a proxy check"""
@@ -81,7 +75,7 @@ class ProxyCheckResult(models.Model):
 
             ip = buf.getvalue().replace('\n', '').replace('\r', '')
 
-            cache.set(ip_key, ip, PROXYLIST_OUTBOUND_IP_CHECK_INTERVAL) 
+            cache.set(ip_key, ip, PROXYLIST_OUTIP_INTERVAL) 
             return ip
 
         except:
@@ -354,6 +348,5 @@ class Proxy(models.Model):
         ordering = ('-last_check', )
 
     def __unicode__(self):
-        #TODO: Mejorar
         return "%s://%s:%s" % (self.proxy_type, self.ip_address, self.port)
 
