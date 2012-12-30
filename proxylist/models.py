@@ -10,10 +10,10 @@ from django_countries import CountryField
 
 from pygeoip import GeoIP
 
-ANONYMITY_NONE   = 1
-ANONYMITY_LOW    = 4
-ANONYMITY_MEDIUM = 8
-ANONYMITY_HIGH   = 16
+ANONYMITY_NONE   = 0
+ANONYMITY_LOW    = 1
+ANONYMITY_MEDIUM = 2
+ANONYMITY_HIGH   = 3
 
 
 def getsettings(key, default):
@@ -31,19 +31,35 @@ PROXYLIST_USER_AGENT = getsettings("PROXYLIST_USER_AGENT", "Django-Proxy 1.0.0")
 class ProxyCheckResult(models.Model):
     """The result of a proxy check"""
 
-    proxy_checker = models.ForeignKey('Mirror')
+    mirror = models.ForeignKey('Mirror')
+
     proxy = models.ForeignKey('Proxy')
 
+    #: Our real outbound IP Address (from worker)
     real_ip_address = models.IPAddressField(blank=True, null=True)
+
+    #: Proxy outbound IP Address (received from mirror)
     ip_address = models.IPAddressField(blank=True, null=True)
-    remote_host = models.CharField(max_length=255, blank=True, null=True)
-    user_agent = models.TextField(blank=True, null=True)
 
-    # CSV of forwarded family headers
-    forwarded = models.CharField(max_length=255, blank=True, null=True)
+    #: True if we found proxy related http headers
+    forwarded = models.BooleanField(default=True)
 
-    check_time = models.DateTimeField()
-    check_delay = models.PositiveIntegerField(null=True)
+    #: True if `real_ip_address` was found at any field
+    ip_reveal = models.BooleanField(default=True)
+
+    #: Check starts 
+    check_start = models.DateTimeField()
+
+    #: Request was received at mirror server
+    response_start = models.DateTimeField()
+
+    #: Request was send back from the mirror
+    response_end = models.DateTimeField()
+
+    #: Check ends
+    check_end = models.DateTimeField()
+
+    raw_response = models.TextField(null=True, blank=True)
 
     def __init__(self, *args, **kwargs):
         super(ProxyCheckResult, self).__init__(*args, **kwargs)
@@ -53,14 +69,14 @@ class ProxyCheckResult(models.Model):
     def _get_real_ip(self):
         import os
         import socket
-        import pycurl
-        import cStringIO
 
         ip_key = '%s.%s.ip' % (socket.gethostname(), os.getpid())
 
         ip = cache.get(ip_key)
         if ip: return ip
-         
+
+        import pycurl
+        import cStringIO
         buf = cStringIO.StringIO()
 
         try:
@@ -84,21 +100,14 @@ class ProxyCheckResult(models.Model):
             buf.close()
 
     def anonymity(self):
-        if self.ip_address == self.real_ip_address or \
-           self.forwarded == self.real_ip_address:
+        if self.forwarded and self.ip_reveal:
             return ANONYMITY_NONE
-        elif self.forwarded and \
-             self.forwarded.find(self.real_ip_address) != -1 and \
-             len(self.forwarded.split(','))>1:
+        elif not self.forwarded and self.ip_reveal:
             return ANONYMITY_LOW
-        elif self.forwarded and \
-             self.forwarded.find(self.real_ip_address) == -1 and \
-             len(self.forwarded.split(',')) == 1:
+        elif self.forwarded and not self.ip_reveal:
             return ANONYMITY_MEDIUM
-        elif not self.forwarded:
-            return ANONYMITY_HIGH
         else:
-            raise ValueError('Anonymity type not defined')
+            return ANONYMITY_HIGH
 
 
 class Mirror(models.Model):
@@ -106,24 +115,22 @@ class Mirror(models.Model):
     Ex: http://ifconfig.me/all.json
     """
 
+
     output_type_choices = (
-        ('json', 'JSON'),
-        # ('xml', 'XML'),
-        # ('plain', 'PLAIN'),
+        ('plm_v1', 'ProxyList Mirror v1.0'),
     )
 
     url = models.URLField()
 
     output_type = models.CharField(max_length=10, 
                                    choices=output_type_choices,
-                                   default='json')
-
+                                   default='plm_v1')
 
     def __unicode__(self):
         return self.url
 
-    def _raw_check(self, proxy):
-        """Actually execute the check"""
+    def _make_request(self, proxy):
+        """Make request to the mirror throught proxy"""
 
         import pycurl
         import cStringIO
@@ -151,33 +158,39 @@ class Mirror(models.Model):
         finally:
             buf.close()
 
-    def _result_from_data(self, proxy, data, start, end):
-        """ Convert parsed data into a ProxyCheckResult object (not saved)"""
-
-        res = ProxyCheckResult()
-        res.check_time = start
-        res.check_delay = (end - start).seconds
-        res.proxy = proxy
-
-        res.ip_address  = data.get('ip_addr', None)
-        res.remote_host = data.get('remote_host', None)
-        res.user_agent  = data.get('user_agent', None)
-        res.forwarded   = data.get('forwarded', None)
-
-        return res
-
-    def _check_json(self, proxy):
-        """Get info from output like http://ifconfig.me/all.json"""
+    def _parse_plm_v1(self, res, raw_data):
+        """ Parse data from a ProxyList Mirror v1.0 output and fill a 
+        ProxyCheckResult object """
 
         import json
+        from dateutil.parser import parse
 
-        start = now()
-        rawdata = self._raw_check(proxy)
-        end = now()
+        FORWARD_HEADERS = set((
+            'FORWARDED',
+            'X_FORWARDED_FOR',
+            'X_FORWARDED_BY',
+            'X_FORWARDED_HOST',
+            'X_FORWARDED_PROTO',
+            'VIA',
+            'CUDA_CLIIP',
+        ))
 
-        data = json.loads(rawdata)
+        data = json.loads(raw_data)
 
-        return self._result_from_data(proxy, data, start, end)
+        res.response_start = parse(data['response_start']) 
+        res.response_end   = parse(data['response_end']) 
+
+        res.ip_address = data.get('REMOTE_ADDR', None)
+
+        # True if we found proxy related http headers
+        headers_keys = set(data['http_headers'].keys())
+        res.forwarded = bool(FORWARD_HEADERS.intersection(headers_keys))
+
+        headers_vals = data['http_headers'].values() 
+
+        #: True if `real_ip_address` was found at any field
+        res.ip_reveal = any([ x.find(res.real_ip_address)!= -1 for x in headers_vals])
+
 
     def is_checking(self, proxy):
         check_key = "proxy.%s.check" % proxy.pk
@@ -191,13 +204,24 @@ class Mirror(models.Model):
 
         res = None
         try:
-            if self.output_type == 'json':
-                res = self._check_json(proxy)
+            
+            res = ProxyCheckResult()
+            res.proxy = proxy
+            res.mirror = self
+            res.check_start = now()
+            raw_data = self._make_request(proxy)
+            res.check_end = now()
+            res.raw_response = raw_data
+
+            if self.output_type == 'plm_v1':
+                self._parse_plm_v1(res, raw_data)
             else:
-                raise NotImplemented('Output type %s not recognized' %
-                                     self.output_type)
+                raise NotImplemented('Output type not found!')
 
             proxy.update_from_check(res)
+
+            res.save()
+
             return res
         except:
             proxy.update_from_error()
@@ -240,22 +264,16 @@ class Proxy(models.Model):
         # proxy.
         (ANONYMITY_NONE, 'None'), 
 
-        # Low anonymity; remote host does not know your IP, but it knows you 
-        # are using proxy.
+        # Low anonymity; proxy sent our IP to remote host, but it was sent in
+        # non standard way (unknown header).
         (ANONYMITY_LOW, 'Low'), 
 
-        # Medium anonymity; remote host knows you are using proxy, and thinks 
-        # it knows your IP, but this is not yours (this is usually a multihomed 
-        # proxy which shows its inbound interface as REMOTE_ADDR for a target 
-        # host).
+        # Medium anonymity; remote host knows you are using proxy, but it does 
+        # not know your IP
         (ANONYMITY_MEDIUM, 'Medium'), 
 
         # High anonymity; remote host does not know your IP and has no direct 
         # proof of proxy usage (proxy-connection family header strings). 
-        # If such hosts do not send additional header strings it may be 
-        # considered as high-anonymous. If a high-anonymous proxy supports 
-        # keep-alive you can consider it to be extremely-anonymous. However, 
-        # such a host is highly possible to be a honey-pot.
         (ANONYMITY_HIGH, 'High'), 
     )
 
@@ -304,8 +322,8 @@ class Proxy(models.Model):
     def update_from_check(self, check):
         """ Update data from a ProxyCheckResult """
 
-        if check.check_time:
-            self.last_check = check.check_time
+        if check.check_start:
+            self.last_check = check.check_start
         else:
             self.last_check = now()
         self.errors = 0
