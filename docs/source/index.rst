@@ -19,6 +19,7 @@ Contents:
    install
    usecase
    commands
+   advconfig
 
 
 Indices and tables
