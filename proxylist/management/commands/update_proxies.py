@@ -1,6 +1,27 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# Copyright 2012 Roberto Abdelkader Martínez Pérez
+# 
+# This file is part of Django-ProxyList.
+# 
+# Django-ProxyList is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# Django-ProxyList is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with Django-ProxyList.  If not, see <http://www.gnu.org/licenses/>.
+
 import os
+
 from django.core.management.base import BaseCommand, CommandError
-from djangoproxy.models import Proxy
+from proxylist.models import Proxy
 
 class Command(BaseCommand):
     args = '<hidemyass proxy list files>'
@@ -31,8 +52,5 @@ class Command(BaseCommand):
                         self.stderr.write("Invalid port %s value" % port)
                         continue
 
-                    p, created = Proxy.objects.get_or_create(
-                                    ip_address=ip_address, 
-                                    port=port)
-
-
+                    p, created = Proxy.objects.get_or_create(ip_address=ip_address, 
+                                                             port=port)
