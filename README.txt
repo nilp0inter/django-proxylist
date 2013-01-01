@@ -6,3 +6,4 @@ contains everything you need to make periodic checks to verify the properties
 of the proxies.
 
 * Gihub: https://github.com/nilp0inter/django-proxylist
+* Pypi:  http://pypi.python.org/pypi/django-proxylist
