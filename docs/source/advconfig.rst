@@ -46,7 +46,7 @@ Advanced configuration
 
 ``PROXYLIST_OUTIP_INTERVAL``
 
-  Number of seconds between outbound IP checking (by worker). If you have a 
+  Number of seconds between outbound IP checking (per worker). If you have a 
   fixed IP address you can set this value to 0 (infinity).
 
   *Default*: 300

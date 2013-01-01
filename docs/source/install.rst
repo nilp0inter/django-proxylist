@@ -38,7 +38,7 @@ You have two choices here:
 Using south
 ~~~~~~~~~~~
 
-We ancourage recommend you using `south` for your database migrations. If you
+We encourage you using `south` for your database migrations. If you
 already use it you can migrate `django-proxylist`:
 
 .. code-block:: bash
